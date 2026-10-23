@@ -35,8 +35,13 @@ import {
   SquarePen,
   MessageSquare,
   Trash2,
+  Send,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import {
+  EmailComposerDialog,
+  type EmailComposerDialogHandle,
+} from "@/components/email-composer-dialog";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -550,34 +555,39 @@ function ChangeAnalysisPanel({ result }: { result: TransformResult }) {
 // ---- Result Card ----
 function ResultCard({
   result,
+  draftId,
   onRegenerate,
   onFeedback,
-  draft,
   selectedPersonas,
-  targetLanguage,
 }: {
   result: TransformResult;
+  draftId: string;
   onRegenerate: (instructions?: string) => Promise<void>;
   onFeedback: (outputId: string, feedback: "like" | "dislike" | null) => void;
-  draft: string;
   selectedPersonas: Persona[];
-  targetLanguage: string | null;
 }) {
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState("");
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(result.rewritten);
   const [refineInput, setRefineInput] = useState("");
   const [isRewriting, setIsRewriting] = useState(false);
   const [largerText, setLargerText] = useState(false);
   const [feedback, setFeedback] = useState<"like" | "dislike" | null>(null);
+  const composerRef = useRef<EmailComposerDialogHandle>(null);
 
   const persona = selectedPersonas.find((p) => p.id === result.persona_id);
   const Icon = persona?.icon ?? Sparkles;
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(editing ? editText : result.rewritten);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = async () => {
+    setCopyError("");
+    try {
+      await navigator.clipboard.writeText(editing ? editText : result.rewritten);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopyError("Clipboard access failed. Check your browser permissions.");
+    }
   };
 
   const handleRewrite = async (instructions?: string) => {
@@ -625,6 +635,7 @@ function ResultCard({
             onClick={handleCopy}
             className="p-2 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/5 transition-all"
             title="Copy"
+            aria-label="Copy generated response"
           >
             {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
           </button>
@@ -632,8 +643,17 @@ function ResultCard({
             onClick={() => { setEditing(!editing); setEditText(result.rewritten); }}
             className="p-2 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/5 transition-all"
             title="Edit"
+            aria-label="Edit generated response"
           >
             <Pencil className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => composerRef.current?.open()}
+            className="p-2 rounded-lg text-white/30 hover:text-white hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 transition-all"
+            title="Compose email"
+            aria-label={`Review and compose email for ${result.persona_label}`}
+          >
+            <Send className="w-4 h-4" aria-hidden="true" />
           </button>
           <button
             onClick={() => void handleRewrite()}
@@ -645,6 +665,16 @@ function ResultCard({
           </button>
         </div>
       </div>
+
+      {(copied || copyError) && (
+        <p
+          role={copyError ? "alert" : "status"}
+          aria-live="polite"
+          className={`px-5 pt-3 text-xs ${copyError ? "text-red-300" : "text-emerald-300"}`}
+        >
+          {copyError || "Copied to clipboard."}
+        </p>
+      )}
 
       {/* Rewritten text */}
       <div className="px-5 py-4">
@@ -730,6 +760,12 @@ function ResultCard({
       <div className="px-5 pb-5">
         <ChangeAnalysisPanel result={result} />
       </div>
+      <EmailComposerDialog
+        ref={composerRef}
+        sourceId={draftId}
+        personaLabel={result.persona_label}
+        generatedText={result.rewritten}
+      />
     </div>
   );
 }
@@ -1277,9 +1313,8 @@ export default function HomePage() {
                   <ResultCard
                     key={`${turn.id}-${result.persona_id}`}
                     result={result}
-                    draft={turn.draft}
+                    draftId={`${turn.id}-${result.output_id ?? result.persona_id}`}
                     selectedPersonas={selectedPersonas}
-                    targetLanguage={turn.targetLanguage}
                     onRegenerate={(instructions) => handleRegenerateOne(result, turn.id, turn.targetLanguage, instructions)}
                     onFeedback={handleFeedback}
                   />
@@ -1514,9 +1549,8 @@ export default function HomePage() {
                 >
                   <ResultCard
                     result={result}
-                    draft={draft}
+                    draftId={`${activeId}-${result.output_id ?? result.persona_id}`}
                     selectedPersonas={selectedPersonas}
-                    targetLanguage={targetLanguage}
                     onRegenerate={(instructions) => handleRegenerateOne(
                       result,
                       activeChat?.turns.find((turn) =>

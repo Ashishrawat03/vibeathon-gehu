@@ -1,0 +1,27 @@
+{
+  "planHash": "f31fd7b8c4830304235d01d09a408479c2b2f168923ff58e1308177104fa0975",
+  "phase": "standalone",
+  "recordedAtUtc": "2026-10-23T15:36:15.7295517Z",
+  "retryCount": 1,
+  "resetBaseline": false,
+  "complete": true,
+  "result": {
+    "setupSucceeded": false,
+    "setupDurationMs": 3025,
+    "setupFailureOutput": "setup step 0 \u0027npm\u0027 failed (exit=-4048, timedOut=False)\r\nnpm warn EBADENGINE Unsupported engine {\r\nnpm warn EBADENGINE   package: \u0027eslint-visitor-keys@5.0.1\u0027,\r\nnpm warn EBADENGINE   required: { node: \u0027^20.19.0 || ^22.13.0 || \u003E=24\u0027 },\r\nnpm warn EBADENGINE   current: { node: \u0027v22.12.0\u0027, npm: \u002710.9.0\u0027 }\r\nnpm warn EBADENGINE }\r\nnpm error code EPERM\r\nnpm error syscall unlink\r\nnpm error path C:\\Users\\arawa\\OneDrive\\Desktop\\gehuuuu\\vibeathon-gehu\\project-boilerplate\\frontend\\node_modules\\lightningcss-win32-x64-msvc\\lightningcss.win32-x64-msvc.node\r\nnpm error errno -4048\r\nnpm error [Error: EPERM: operation not permitted, unlink \u0027C:\\Users\\arawa\\OneDrive\\Desktop\\gehuuuu\\vibeathon-gehu\\project-boilerplate\\frontend\\node_modules\\lightningcss-win32-x64-msvc\\lightningcss.win32-x64-msvc.node\u0027] {\r\nnpm error   errno: -4048,\r\nnpm error   code: \u0027EPERM\u0027,\r\nnpm error   syscall: \u0027unlink\u0027,\r\nnpm error   path: \u0027C:\\\\Users\\\\arawa\\\\OneDrive\\\\Desktop\\\\gehuuuu\\\\vibeathon-gehu\\\\project-boilerplate\\\\frontend\\\\node_modules\\\\lightningcss-win32-x64-msvc\\\\lightningcss.win32-x64-msvc.node\u0027\r\nnpm error }\r\nnpm error\r\nnpm error The operation was rejected by your operating system.\r\nnpm error It\u0027s possible that the file was already in use (by a text editor or antivirus),\r\nnpm error or that you lack permissions to access it.\r\nnpm error\r\nnpm error If you believe this might be a permissions issue, please double-check the\r\nnpm error permissions of the file and its containing directories, or try running\r\nnpm error the command again as root/Administrator.\r\nnpm error A complete log of this run can be found in: C:\\Users\\arawa\\AppData\\Local\\npm-cache\\_logs\\2026-10-23T15_36_13_066Z-debug-0.log\r\n",
+    "assertions": [],
+    "executions": [
+      {
+        "source": "setup[0]",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.CMD",
+        "args": [
+          "ci"
+        ],
+        "cwd": "C:\\Users\\arawa\\OneDrive\\Desktop\\gehuuuu\\vibeathon-gehu\\project-boilerplate\\frontend",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      }
+    ]
+  }
+}
