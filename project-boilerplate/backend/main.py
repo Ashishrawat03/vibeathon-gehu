@@ -86,10 +86,7 @@ async def health_check():
 
 
 # ==============================================================================
-# TODO FOR AI AGENT: Register Modular API Routers Below
+# Registered API Routers
 # ==============================================================================
-# Example:
-# from app.api.routes import auth, chat, rag
-# app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth"])
-# app.include_router(chat.router, prefix="/api/v1/chat", tags=["AI Chat"])
-# app.include_router(rag.router, prefix="/api/v1/rag", tags=["RAG & Embeddings"])
+from app.api.routes import transform
+app.include_router(transform.router, prefix="/api/v1", tags=["Transform"])

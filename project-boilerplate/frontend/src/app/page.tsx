@@ -51,7 +51,7 @@ export default function LoginPage() {
             <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center">
               <Sparkles className="w-4 h-4 text-black" />
             </div>
-            <span className="text-white font-semibold text-lg tracking-tight">VoiceCraft</span>
+            <span className="text-white font-semibold text-lg tracking-tight">Persona Transformer</span>
           </motion.div>
           <h1 className="text-[22px] font-semibold text-white text-center">Welcome back</h1>
           <p className="text-sm text-white/40 mt-1 text-center">Sign in to your account</p>

@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "VoiceCraft — Instant Persona Transformer",
+  title: "Persona Transformer — One message. Every persona.",
   description:
-    "Rewrite any message for any audience in seconds. Transform rough drafts into polished, audience-ready communication.",
+    "Transform your rough drafts into the right message for every audience. Rewrite for any persona in seconds.",
 };
 
 export default function RootLayout({
