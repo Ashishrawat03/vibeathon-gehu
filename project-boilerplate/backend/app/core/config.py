@@ -4,12 +4,15 @@ Usage: from app.core.config import get_settings; s = get_settings()
 """
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=BACKEND_DIR / ".env.test", extra="ignore")
 
     app_name: str = "Hackathon-AI-Backend"
 
@@ -29,10 +32,7 @@ class Settings(BaseSettings):
     hf_embedding_model: str = "BAAI/bge-small-en-v1.5"
     hf_embedding_dim: int = 384
 
-    supabase_url: str = ""
-    supabase_anon_key: str = ""
-    supabase_service_role_key: str = ""
-    supabase_jwt_secret: str = ""
+    jwt_secret: str = "local-development-only-change-this-secret"
 
     @property
     def groq_keys(self) -> list[str]:

@@ -11,8 +11,10 @@ __pycache__/
 # Environment variables & secrets (NEVER COMMIT THESE)
 .env
 .env.local
+.env.test
 .env.*.local
 backend/.env
+backend/.env.test
 *service-account*.json
 *firebase-adminsdk*.json
 

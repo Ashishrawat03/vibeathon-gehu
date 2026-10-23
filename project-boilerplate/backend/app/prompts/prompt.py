@@ -40,7 +40,7 @@ PERSONAS = {
     "genz": {
         "label": "Gen-Z Hype",
         "rules": (
-            "High energy, natural Gen-Z vibe (lowkey, no cap, fr, bet), 1-3 fitting emojis. "
+            "High energy, natural Gen-Z vibe (lowkey, no cap, fr, bet). Never use emojis. "
             "Short punchy lines, relatable and chill, while keeping every single fact/number 100% accurate."
         ),
     },

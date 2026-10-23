@@ -7,11 +7,16 @@ POST /api/v1/translate        -> translate draft to target language
 """
 
 import asyncio
+import re
+import uuid
+from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from app.core.security import get_current_user
+from app.db import sqlite as db
 from app.schemas.common import AIResponse, AIMeta
 from app.services.llm_service import generate_json, generate
 
@@ -54,6 +59,7 @@ class ChangeAnalysis(BaseModel):
 
 
 class TransformResult(BaseModel):
+    output_id: Optional[str] = None
     persona_id: str
     persona_label: str
     original: str
@@ -66,11 +72,81 @@ class BatchTransformRequest(BaseModel):
     draft: str = Field(..., min_length=1)
     personas: list[PersonaConfig] = Field(..., min_length=1)
     target_language: Optional[str] = None
+    chat_id: Optional[str] = None
 
 
 class TranslateRequest(BaseModel):
     text: str = Field(..., min_length=1)
     target_language: str = Field(..., description="Target language name, e.g. 'Hindi'")
+
+
+class OutputFeedbackRequest(BaseModel):
+    feedback: Optional[str] = Field(default=None, pattern="^(like|dislike)$")
+
+
+def _persist_results(
+    user_id: str,
+    chat_id: Optional[str],
+    draft: str,
+    personas: list[PersonaConfig],
+    target_language: Optional[str],
+    results: list[dict],
+) -> list[dict]:
+    persisted = []
+    now = datetime.now(timezone.utc).isoformat()
+    chat_id = chat_id or str(uuid.uuid4())
+    with db.get_conn() as conn:
+        existing = conn.execute("SELECT user_id FROM chats WHERE id = ?", (chat_id,)).fetchone()
+        if existing and existing["user_id"] != user_id:
+            raise HTTPException(status_code=403, detail="Chat does not belong to this user")
+        conn.execute(
+            """
+            INSERT INTO chats (id, user_id, title, selected_ids, target_language, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                title = excluded.title,
+                selected_ids = excluded.selected_ids,
+                target_language = excluded.target_language,
+                updated_at = excluded.updated_at
+            """,
+            (
+                chat_id,
+                user_id,
+                " ".join(draft.split())[:60] or "New chat",
+                db.dumps([persona.id for persona in personas]),
+                target_language,
+                now,
+                now,
+            ),
+        )
+        for result in results:
+            if result.get("error") or not result.get("rewritten"):
+                persisted.append(result)
+                continue
+            output_id = str(uuid.uuid4())
+            result["output_id"] = output_id
+            conn.execute(
+                """
+                INSERT INTO outputs (
+                    id, user_id, chat_id, persona_id, persona_label, original,
+                    rewritten, language, analysis_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    output_id,
+                    user_id,
+                    chat_id,
+                    result["persona_id"],
+                    result["persona_label"],
+                    result["original"],
+                    result["rewritten"],
+                    result.get("language"),
+                    db.dumps(result.get("analysis")),
+                    now,
+                ),
+            )
+            persisted.append(result)
+    return persisted
 
 
 # ---------------------------------------------------------------------------
@@ -101,6 +177,31 @@ def _compute_change_percent(original: str, rewritten: str) -> float:
     return round(min(100.0, (dist / max_len) * 100), 1)
 
 
+EMOJI_RE = re.compile(
+    "["
+    "\U0001F600-\U0001F64F"
+    "\U0001F300-\U0001F5FF"
+    "\U0001F680-\U0001F6FF"
+    "\U0001F1E0-\U0001F1FF"
+    "\U00002700-\U000027BF"
+    "\U0001F900-\U0001F9FF"
+    "\U00002600-\U000026FF"
+    "\U0001FA00-\U0001FAFF"
+    "\U0001FA70-\U0001FAFF"
+    "\U0000200D"
+    "\U0000FE0F"
+    "]+",
+    flags=re.UNICODE,
+)
+
+
+def strip_emojis(text: str) -> str:
+    cleaned = EMOJI_RE.sub("", text or "")
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
+
+
 TRANSFORM_SYSTEM = """You are an expert communication coach and writing assistant.
 Your job is to rewrite the user's draft for a specific target audience (persona).
 
@@ -108,6 +209,7 @@ Rules:
 - Preserve ALL factual content: names, numbers, dates, deadlines, commitments.
 - Do NOT invent new facts or make promises not in the original.
 - Match the tone, vocabulary, and style of the specified persona precisely.
+- Never use emojis, emoticons, or decorative symbols anywhere in the rewritten text.
 - Output ONLY valid JSON matching the exact schema requested.
 """
 
@@ -174,7 +276,7 @@ async def _transform_single(draft: str, persona: PersonaConfig, target_language:
         temperature=0.5,
     )
 
-    rewritten = data.get("rewritten", "")
+    rewritten = strip_emojis(str(data.get("rewritten", "")))
     change_percent = _compute_change_percent(draft, rewritten)
 
     analysis = ChangeAnalysis(
@@ -199,7 +301,7 @@ async def _transform_single(draft: str, persona: PersonaConfig, target_language:
 # ---------------------------------------------------------------------------
 
 @router.post("/transform", response_model=AIResponse, tags=["Transform"])
-async def transform_draft(req: TransformRequest):
+async def transform_draft(req: TransformRequest, user: dict = Depends(get_current_user)):
     """
     Rewrite a draft for a single persona.
     Optionally translate the output to a target language.
@@ -208,9 +310,19 @@ async def transform_draft(req: TransformRequest):
         raise HTTPException(400, "Draft cannot be empty")
     try:
         result = await _transform_single(req.draft, req.persona, req.target_language)
+        saved_result = _persist_results(
+            user["id"],
+            None,
+            req.draft,
+            [req.persona],
+            req.target_language,
+            [result.model_dump()],
+        )[0]
         # Use a lightweight meta since generate_json consumed the real one internally
         meta = AIMeta(provider="groq", model_used="llama-3.3-70b-versatile", latency_ms=0, fallback_used=False)
-        return AIResponse(data=result.model_dump(), meta=meta)
+        return AIResponse(data=saved_result, meta=meta)
+    except HTTPException:
+        raise
     except RuntimeError as e:
         raise HTTPException(503, detail=f"AI service unavailable: {e}")
     except Exception as e:
@@ -218,7 +330,7 @@ async def transform_draft(req: TransformRequest):
 
 
 @router.post("/transform/batch", response_model=AIResponse, tags=["Transform"])
-async def transform_batch(req: BatchTransformRequest):
+async def transform_batch(req: BatchTransformRequest, user: dict = Depends(get_current_user)):
     """
     Rewrite a draft for multiple personas in parallel.
     Returns a list of results, one per persona.
@@ -248,6 +360,15 @@ async def transform_batch(req: BatchTransformRequest):
             else:
                 output.append(r.model_dump())
 
+        output = _persist_results(
+            user["id"],
+            req.chat_id,
+            req.draft,
+            req.personas,
+            req.target_language,
+            output,
+        )
+
         meta = AIMeta(provider="groq", model_used="llama-3.3-70b-versatile", latency_ms=0, fallback_used=False)
         return AIResponse(data=output, meta=meta)
     except RuntimeError as e:
@@ -255,7 +376,7 @@ async def transform_batch(req: BatchTransformRequest):
 
 
 @router.post("/translate", response_model=AIResponse, tags=["Transform"])
-async def translate_text(req: TranslateRequest):
+async def translate_text(req: TranslateRequest, _user: dict = Depends(get_current_user)):
     """
     Translate the given text into the specified target language.
     """
@@ -268,10 +389,26 @@ async def translate_text(req: TranslateRequest):
     )
     try:
         data, _meta = await generate_json(prompt, system=TRANSLATE_SYSTEM, temperature=0.2)
-        translated = data.get("translated", "")
+        translated = strip_emojis(str(data.get("translated", "")))
         meta = AIMeta(provider="groq", model_used="llama-3.3-70b-versatile", latency_ms=0, fallback_used=False)
         return AIResponse(data={"translated": translated, "target_language": req.target_language}, meta=meta)
     except RuntimeError as e:
         raise HTTPException(503, detail=f"AI service unavailable: {e}")
     except Exception as e:
         raise HTTPException(500, detail=f"Translation failed: {e}")
+
+
+@router.put("/outputs/{output_id}/feedback", tags=["Transform"])
+def update_output_feedback(
+    output_id: str,
+    req: OutputFeedbackRequest,
+    user: dict = Depends(get_current_user),
+):
+    with db.get_conn() as conn:
+        result = conn.execute(
+            "UPDATE outputs SET feedback = ? WHERE id = ? AND user_id = ?",
+            (req.feedback, output_id, user["id"]),
+        )
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Output not found")
+    return {"output_id": output_id, "feedback": req.feedback}

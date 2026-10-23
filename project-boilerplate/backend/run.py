@@ -8,28 +8,32 @@ Or after activating `.venv`:
 """
 
 import os
+from pathlib import Path
+
 import uvicorn
 from dotenv import load_dotenv
 
-load_dotenv()
+BACKEND_DIR = Path(__file__).resolve().parent
+load_dotenv(BACKEND_DIR / ".env.test")
 
 
 def start_server():
-    host = os.getenv("HOST", "0.0.0.0")
+    host = os.getenv("HOST", "127.0.0.1")
     port = int(os.getenv("PORT", "8000"))
     reload_enabled = os.getenv("RELOAD", "true").lower() in ("true", "1", "yes")
     log_level = "debug" if os.getenv("DEBUG", "true").lower() == "true" else "info"
 
     print("=" * 65)
-    print(f"🔥 Launching FastAPI Server via run.py")
-    print(f"🌐 Local URL   : http://localhost:{port}")
-    print(f"📚 Swagger Docs: http://localhost:{port}/docs")
-    print(f"❤️  Health Check: http://localhost:{port}/api/health")
-    print(f"♻️  Auto-Reload : {reload_enabled}")
+    print("Launching FastAPI Server via run.py")
+    print(f"Local URL   : http://127.0.0.1:{port}")
+    print(f"Swagger Docs: http://127.0.0.1:{port}/docs")
+    print(f"Health Check: http://127.0.0.1:{port}/api/health")
+    print(f"Auto-Reload : {reload_enabled}")
     print("=" * 65)
 
     uvicorn.run(
         "main:app",
+        app_dir=str(BACKEND_DIR),
         host=host,
         port=port,
         reload=reload_enabled,
