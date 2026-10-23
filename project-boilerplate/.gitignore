@@ -1,0 +1,44 @@
+# Python & uv virtual environments
+.venv/
+venv/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Environment variables & secrets (NEVER COMMIT THESE)
+.env
+.env.local
+.env.*.local
+backend/.env
+*service-account*.json
+*firebase-adminsdk*.json
+
+# uv & build artifacts
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Local databases & vector stores
+*.db
+*.sqlite3
+chroma_db/
+faiss_index/
+
+# Logs & temp files
+*.log
+logs/
+tmp/
+temp/
+
+# OS & Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
